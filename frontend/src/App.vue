@@ -1,12 +1,17 @@
 <template>
-  <NewTask @btn-new-task="handleNewTask" />
-  <TasksList v-if="showTasksList" @edit-task-id="handleNewTask" />
-  <TaskForm
-    v-else
-    @task-created="handleCreateTask"
-    @task-updated="handleUpdateTask"
-    :currentTask="currentTask"
-  />
+  <div>
+    <div v-if="errorMessage" class="error-banner" role="alert">
+      {{ errorMessage }}
+    </div>
+    <NewTask @btn-new-task="handleNewTask" />
+    <TasksList v-if="showTasksList" @edit-task-id="handleNewTask" />
+    <TaskForm
+      v-else
+      @task-created="handleCreateTask"
+      @task-updated="handleUpdateTask"
+      :currentTask="currentTask"
+    />
+  </div>
 </template>
 
 <script>
@@ -20,6 +25,7 @@ export default {
     return {
       showTasksList: true,
       currentTask: 0,
+      errorMessage: "",
     };
   },
   components: {
@@ -30,33 +36,33 @@ export default {
   methods: {
     handleNewTask(taskId) {
       this.currentTask = taskId || 0;
+      this.errorMessage = "";
       this.showTasksList = !this.showTasksList;
     },
 
     async handleCreateTask(form) {
-      await fetch(`http://localhost:4567/api/v1/tasks`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(form),
-      })
-        .then((response) => {
-          if (response.ok) {
-            return response.json();
-          } else {
-            throw new Error("Failed to create task");
-          }
-        })
-        .then((data) => {
-          console.log("Task created successfully:", data);
-        })
-        .then(() => {
-          this.handleNewTask();
-        })
-        .catch((error) => {
-          console.error("Error creating task:", error);
+      try {
+        const response = await fetch(`http://localhost:4567/api/v1/tasks`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(form),
         });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => null);
+          throw new Error(errorData?.details?.join(" ") || errorData?.error || "Failed to create task");
+        }
+
+        const data = await response.json();
+        console.log("Task created successfully:", data);
+        this.errorMessage = "";
+        this.handleNewTask();
+      } catch (error) {
+        console.error("Error creating task:", error);
+        this.errorMessage = error.message;
+      }
     },
 
     async handleUpdateTask(form, taskId) {
@@ -72,14 +78,17 @@ export default {
           }
         );
 
-        if (response.ok) {
-          console.log("Task updated successfully");
-          this.handleNewTask();
-        } else {
-          console.error("Failed to update task");
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => null);
+          throw new Error(errorData?.details?.join(" ") || errorData?.error || "Failed to update task");
         }
+
+        console.log("Task updated successfully");
+        this.errorMessage = "";
+        this.handleNewTask();
       } catch (error) {
         console.error("Error updating task:", error);
+        this.errorMessage = error.message;
       }
     },
   },
@@ -94,5 +103,15 @@ export default {
   -moz-osx-font-smoothing: grayscale;
   text-align: center;
   margin-top: 60px;
+}
+
+.error-banner {
+  max-width: 600px;
+  margin: 0 auto 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid #d33;
+  background: #ffe6e6;
+  color: #a00;
+  border-radius: 6px;
 }
 </style>
