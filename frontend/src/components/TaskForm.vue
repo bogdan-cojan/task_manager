@@ -1,5 +1,9 @@
 <template>
   <div class="container notice">
+    <div v-if="errorMessage" class="error-message" role="alert">
+      {{ errorMessage }}
+    </div>
+
     <label for="taskTitle">Title</label>
     <input v-model="form.title" type="text" id="taskTitle" /><br />
 
@@ -24,12 +28,41 @@ export default {
         title: "",
         description: "",
       },
+      errorMessage: "",
     };
   },
   mounted() {
     this.fetchTask();
   },
   methods: {
+    validateForm() {
+      const title = this.form.title.trim();
+      const description = this.form.description.trim();
+
+      if (!title) {
+        this.errorMessage = "Title is required.";
+        return false;
+      }
+
+      if (title.length > 255) {
+        this.errorMessage = "Title must be 255 characters or fewer.";
+        return false;
+      }
+
+      if (!description) {
+        this.errorMessage = "Description is required.";
+        return false;
+      }
+
+      if (description.length > 1000) {
+        this.errorMessage = "Description must be 1000 characters or fewer.";
+        return false;
+      }
+
+      this.errorMessage = "";
+      return true;
+    },
+
     async fetchTask() {
       if (this.currentTask != 0) {
         try {
@@ -45,22 +78,35 @@ export default {
             this.form.title = data["title"];
             this.form.description = data["description"];
           } else {
-            console.error("Failed to fetch tasks");
+            const errorData = await response.json().catch(() => null);
+            console.error(
+              "Failed to fetch task:",
+              errorData?.error || "Unknown error"
+            );
           }
         } catch (error) {
-          console.error("Error fetching tasks:", error);
+          console.error("Error fetching task:", error);
         }
       }
     },
 
     handleSaveTask() {
-      if (this.currentTask == 0) {
-        this.$emit("task-created", this.form);
-      } else {
-        this.$emit("task-updated", this.form, this.currentTask);
+      if (!this.validateForm()) {
+        return;
       }
-      this.form.title = "";
-      this.form.description = "";
+
+      const payload = {
+        title: this.form.title.trim(),
+        description: this.form.description.trim(),
+      };
+
+      if (this.currentTask == 0) {
+        this.$emit("task-created", payload);
+      } else {
+        this.$emit("task-updated", payload, this.currentTask);
+      }
+
+      this.errorMessage = "";
     },
   },
 };
@@ -71,5 +117,16 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+.error-message {
+  width: 100%;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  border: 1px solid #d33;
+  background: #ffe6e6;
+  color: #a00;
+  border-radius: 6px;
+  text-align: center;
 }
 </style>
